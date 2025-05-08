@@ -1,7 +1,7 @@
 DATASET: 'NuScenesDataset'
-DATA_PATH: '../data/nuscenes'
+DATA_PATH: '/data/data/demirhan_kramer_WiSe2425/nuscenes'
 
-VERSION: 'v1.0-trainval'
+VERSION: 'v1.0-mini'
 MAX_SWEEPS: 10
 PRED_VELOCITY: True
 SET_NAN_VELOCITY_TO_ZEROS: True
@@ -13,8 +13,8 @@ DATA_SPLIT: {
 }
 
 INFO_PATH: {
-    'train': [nuscenes_infos_10sweeps_train.pkl],
-    'test': [nuscenes_infos_10sweeps_val.pkl],
+    'train': [/data/data/demirhan_kramer_WiSe2425/nuscenes/nuscenes_infos_10sweeps_train.pkl],
+    'test': [/data/data/demirhan_kramer_WiSe2425/nuscenes/nuscenes_infos_10sweeps_val.pkl],
 }
 
 POINT_CLOUD_RANGE: [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]

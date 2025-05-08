@@ -223,25 +223,38 @@ class DatasetTemplate(torch_data.Dataset):
         for cur_sample in batch_list:
             for key, val in cur_sample.items():
                 data_dict[key].append(val)
+        
         batch_size = len(batch_list)
         ret = {}
         batch_size_ratio = 1
 
         for key, val in data_dict.items():
             try:
-                if key in ['voxels', 'voxel_num_points']:
+                # Handle img_process_infos separately
+                if key == "img_process_infos":
+                    processed_infos = []
+                    for item in val:
+                        processed_item = []
+                        for sub_item in item:
+                            processed_item.append(sub_item)  # Keep the tuple as-is
+                        processed_infos.append(processed_item)
+                    ret[key] = np.array(processed_infos, dtype=object)  # Ensure the processed list is a numpy array
+
+                elif key in ['voxels', 'voxel_num_points']:
                     if isinstance(val[0], list):
                         batch_size_ratio = len(val[0])
                         val = [i for item in val for i in item]
                     ret[key] = np.concatenate(val, axis=0)
+
                 elif key in ['points', 'voxel_coords']:
                     coors = []
                     if isinstance(val[0], list):
-                        val =  [i for item in val for i in item]
+                        val = [i for item in val for i in item]
                     for i, coor in enumerate(val):
                         coor_pad = np.pad(coor, ((0, 0), (1, 0)), mode='constant', constant_values=i)
                         coors.append(coor_pad)
                     ret[key] = np.concatenate(coors, axis=0)
+
                 elif key in ['gt_boxes']:
                     max_gt = max([len(x) for x in val])
                     batch_gt_boxes3d = np.zeros((batch_size, max_gt, val[0].shape[-1]), dtype=np.float32)
@@ -253,33 +266,31 @@ class DatasetTemplate(torch_data.Dataset):
                     max_gt = max([x.shape[1] for x in val])
                     batch_gt_boxes3d = np.zeros((batch_size, val[0].shape[0], max_gt, val[0].shape[-1]), dtype=np.float32)
                     for k in range(batch_size):
-                        batch_gt_boxes3d[k,:, :val[k].shape[1], :] = val[k]
+                        batch_gt_boxes3d[k, :, :val[k].shape[1], :] = val[k]
                     ret[key] = batch_gt_boxes3d
 
                 elif key in ['roi_scores', 'roi_labels']:
                     max_gt = max([x.shape[1] for x in val])
                     batch_gt_boxes3d = np.zeros((batch_size, val[0].shape[0], max_gt), dtype=np.float32)
                     for k in range(batch_size):
-                        batch_gt_boxes3d[k,:, :val[k].shape[1]] = val[k]
+                        batch_gt_boxes3d[k, :, :val[k].shape[1]] = val[k]
                     ret[key] = batch_gt_boxes3d
 
                 elif key in ['gt_boxes2d']:
-                    max_boxes = 0
                     max_boxes = max([len(x) for x in val])
                     batch_boxes2d = np.zeros((batch_size, max_boxes, val[0].shape[-1]), dtype=np.float32)
                     for k in range(batch_size):
                         if val[k].size > 0:
                             batch_boxes2d[k, :val[k].__len__(), :] = val[k]
                     ret[key] = batch_boxes2d
+
                 elif key in ["images", "depth_maps"]:
-                    # Get largest image size (H, W)
                     max_h = 0
                     max_w = 0
                     for image in val:
                         max_h = max(max_h, image.shape[0])
                         max_w = max(max_w, image.shape[1])
 
-                    # Change size of images
                     images = []
                     for image in val:
                         pad_h = common_utils.get_pad_params(desired_size=max_h, cur_size=image.shape[0])
@@ -293,33 +304,38 @@ class DatasetTemplate(torch_data.Dataset):
                             pad_width = (pad_h, pad_w)
 
                         image_pad = np.pad(image,
-                                           pad_width=pad_width,
-                                           mode='constant',
-                                           constant_values=pad_value)
+                                        pad_width=pad_width,
+                                        mode='constant',
+                                        constant_values=pad_value)
 
                         images.append(image_pad)
                     ret[key] = np.stack(images, axis=0)
+
                 elif key in ['calib']:
                     ret[key] = val
+
                 elif key in ["points_2d"]:
                     max_len = max([len(_val) for _val in val])
                     pad_value = 0
                     points = []
                     for _points in val:
-                        pad_width = ((0, max_len-len(_points)), (0,0))
+                        pad_width = ((0, max_len-len(_points)), (0, 0))
                         points_pad = np.pad(_points,
-                                pad_width=pad_width,
-                                mode='constant',
-                                constant_values=pad_value)
+                                            pad_width=pad_width,
+                                            mode='constant',
+                                            constant_values=pad_value)
                         points.append(points_pad)
                     ret[key] = np.stack(points, axis=0)
+
                 elif key in ['camera_imgs']:
-                    ret[key] = torch.stack([torch.stack(imgs,dim=0) for imgs in val],dim=0)
+                    ret[key] = torch.stack([torch.stack(imgs, dim=0) for imgs in val], dim=0)
+
                 else:
                     ret[key] = np.stack(val, axis=0)
             except:
-                print('Error in collate_batch: key=%s' % key)
+                print(f"Error in collate_batch: key={key}")
                 raise TypeError
 
         ret['batch_size'] = batch_size * batch_size_ratio
         return ret
+
